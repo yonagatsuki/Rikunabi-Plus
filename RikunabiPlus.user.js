@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.4.2
+// @version      1.5.1
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -23,7 +23,9 @@
   const CACHE_PREFIX = 'rikunabi_salary_v4:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
+  const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
   const visibleCardsByUrl = new Map();
+  const salaryTextByUrl = new Map();
 
   const salaryLabelRe = /(給与|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
   const moneyRe = /(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円)|[¥￥]\s*[0-9０-９])/;
@@ -90,6 +92,49 @@
     }
     .rk-plus-floating-button:hover {
       background: #d04a17;
+    }
+    .rk-plus-salary-filter {
+      position: fixed;
+      right: 16px;
+      bottom: 58px;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      background: #fff;
+      color: #222;
+      padding: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
+      font-size: 12px;
+    }
+    .rk-plus-salary-filter label {
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .rk-plus-salary-filter input {
+      box-sizing: border-box;
+      width: 72px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 12px;
+      padding: 4px 6px;
+    }
+    .rk-plus-salary-filter button {
+      appearance: none;
+      border: 1px solid #d6d6d6;
+      border-radius: 4px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.3;
+      padding: 4px 8px;
+    }
+    .rk-plus-salary-filter button:hover {
+      background: #f5f5f5;
+      border-color: #999;
     }
     .rk-plus-panel-backdrop {
       position: fixed;
@@ -334,12 +379,8 @@
 
       visibleCardsByUrl.set(url, card);
 
-      if (isHiddenJob(url)) {
-        card.style.display = 'none';
-        continue;
-      }
-
       addHideButton(card, url);
+      updateCardVisibility(url);
 
       seenCards.add(card);
       cards.push({ card, url });
@@ -364,7 +405,7 @@
     } catch {
       // localStorage が利用できない場合でも、現在のページでは非表示にする。
     }
-    card.style.display = 'none';
+    updateCardVisibility(url);
     updateHiddenManagerButton();
   }
 
@@ -378,8 +419,8 @@
 
     const card = visibleCardsByUrl.get(url);
     if (card) {
-      card.style.display = '';
       addHideButton(card, url);
+      updateCardVisibility(url);
     }
 
     updateHiddenManagerButton();
@@ -472,6 +513,124 @@
 
     document.body.appendChild(button);
     updateHiddenManagerButton();
+  }
+
+  function ensureSalaryFilter() {
+    if (document.querySelector('.rk-plus-salary-filter')) return;
+
+    const filter = document.createElement('div');
+    filter.className = 'rk-plus-salary-filter';
+    filter.innerHTML = `
+      <label for="rk-plus-min-salary">最低月給</label>
+      <input id="rk-plus-min-salary" type="number" min="0" step="1" inputmode="numeric" placeholder="万円">
+      <span>万円</span>
+      <button type="button" class="rk-plus-salary-clear">解除</button>
+    `;
+
+    const input = filter.querySelector('input');
+    input.value = getMinMonthlySalaryMan() || '';
+    input.addEventListener('input', () => {
+      setMinMonthlySalaryMan(input.value);
+      applySalaryFilter();
+    });
+
+    filter.querySelector('.rk-plus-salary-clear').addEventListener('click', () => {
+      input.value = '';
+      setMinMonthlySalaryMan('');
+      applySalaryFilter();
+    });
+
+    document.body.appendChild(filter);
+  }
+
+  function getMinMonthlySalaryMan() {
+    try {
+      return localStorage.getItem(SALARY_FILTER_KEY) || '';
+    } catch {
+      return '';
+    }
+  }
+
+  function setMinMonthlySalaryMan(value) {
+    try {
+      const normalized = String(value || '').trim();
+      if (normalized) localStorage.setItem(SALARY_FILTER_KEY, normalized);
+      else localStorage.removeItem(SALARY_FILTER_KEY);
+    } catch {
+      // localStorage が利用できない場合は何もしない。
+    }
+  }
+
+  function getMinMonthlySalaryYen() {
+    const value = Number(getMinMonthlySalaryMan());
+    return Number.isFinite(value) && value > 0 ? value * 10000 : 0;
+  }
+
+  function parseMonthlySalaryYen(text) {
+    const normalized = String(text || '')
+      .replace(/[０-９]/g, ch => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0))
+      .replace(/[，,]/g, '')
+      .replace(/[．]/g, '.')
+      .replace(/[〜～−ー―-]/g, '~');
+
+    const monthlyLine = normalized
+      .split('\n')
+      .map(line => line.trim())
+      .find(line => /(月給|基本給|初任給|給与)/.test(line) && /([0-9]+(?:\.[0-9]+)?\s*万\s*[0-9]*\s*円|[0-9]+(?:\.[0-9]+)?\s*万円|[0-9]{5,}\s*円)/.test(line));
+
+    const target = monthlyLine || normalized;
+    const values = extractYenValues(target);
+    if (!values.length) return 0;
+
+    return Math.min(...values);
+  }
+
+  function extractYenValues(text) {
+    const values = [];
+    let rest = String(text || '');
+
+    rest = rest.replace(/([0-9]+(?:\.[0-9]+)?)\s*万\s*([0-9]{1,4})\s*円/g, (_match, man, yenPart) => {
+      const value = Number(man) * 10000 + Number(yenPart);
+      if (Number.isFinite(value)) values.push(value);
+      return ' ';
+    });
+
+    rest = rest.replace(/([0-9]+(?:\.[0-9]+)?)\s*万円/g, (_match, man) => {
+      const value = Number(man) * 10000;
+      if (Number.isFinite(value)) values.push(value);
+      return ' ';
+    });
+
+    rest = rest.replace(/([0-9]{5,})\s*円/g, (_match, yen) => {
+      const value = Number(yen);
+      if (Number.isFinite(value)) values.push(value);
+      return ' ';
+    });
+
+    return values.filter(value => value > 0);
+  }
+
+  function updateCardVisibility(url) {
+    const card = visibleCardsByUrl.get(url);
+    if (!card) return;
+
+    if (isHiddenJob(url)) {
+      card.style.display = 'none';
+      return;
+    }
+
+    const minMonthlySalary = getMinMonthlySalaryYen();
+    if (minMonthlySalary > 0) {
+      const salary = parseMonthlySalaryYen(salaryTextByUrl.get(url));
+      card.style.display = salary >= minMonthlySalary ? '' : 'none';
+      return;
+    }
+
+    card.style.display = '';
+  }
+
+  function applySalaryFilter() {
+    visibleCardsByUrl.forEach((_, url) => updateCardVisibility(url));
   }
 
   function updateHiddenManagerButton() {
@@ -627,7 +786,9 @@
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached) {
+        salaryTextByUrl.set(url, cached);
         render(box, cached);
+        updateCardVisibility(url);
         return;
       }
 
@@ -635,9 +796,13 @@
       const salary = extractSalary(html) || '給与情報が見つかりませんでした';
 
       sessionStorage.setItem(cacheKey, salary);
+      salaryTextByUrl.set(url, salary);
       render(box, salary);
+      updateCardVisibility(url);
     } catch {
       box.remove();
+      salaryTextByUrl.set(url, '');
+      updateCardVisibility(url);
     }
   }
 
@@ -659,6 +824,7 @@
     if (!isLikelySearchPage()) return;
 
     ensureHiddenManager();
+    ensureSalaryFilter();
 
     const items = findResultCards().map(({ card, url }) => ({
       url,
