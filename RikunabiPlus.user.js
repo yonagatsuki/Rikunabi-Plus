@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.1
+// @version      1.5.2
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -26,6 +26,7 @@
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
   const visibleCardsByUrl = new Map();
   const salaryTextByUrl = new Map();
+  const salaryQueuedUrls = new Set();
 
   const salaryLabelRe = /(給与|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
   const moneyRe = /(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円)|[¥￥]\s*[0-9０-９])/;
@@ -532,12 +533,14 @@
     input.addEventListener('input', () => {
       setMinMonthlySalaryMan(input.value);
       applySalaryFilter();
+      scheduleScan(50);
     });
 
     filter.querySelector('.rk-plus-salary-clear').addEventListener('click', () => {
       input.value = '';
       setMinMonthlySalaryMan('');
       applySalaryFilter();
+      scheduleScan(50);
     });
 
     document.body.appendChild(filter);
@@ -621,6 +624,11 @@
 
     const minMonthlySalary = getMinMonthlySalaryYen();
     if (minMonthlySalary > 0) {
+      if (!salaryTextByUrl.has(url)) {
+        card.style.display = 'none';
+        return;
+      }
+
       const salary = parseMonthlySalaryYen(salaryTextByUrl.get(url));
       card.style.display = salary >= minMonthlySalary ? '' : 'none';
       return;
@@ -826,10 +834,15 @@
     ensureHiddenManager();
     ensureSalaryFilter();
 
-    const items = findResultCards().map(({ card, url }) => ({
-      url,
-      box: insertBox(card),
-    }));
+    const items = findResultCards()
+      .filter(({ url }) => !salaryQueuedUrls.has(url) && !salaryTextByUrl.has(url))
+      .map(({ card, url }) => {
+        salaryQueuedUrls.add(url);
+        return {
+          url,
+          box: insertBox(card),
+        };
+      });
 
     if (items.length) runQueue(items);
   }
@@ -837,8 +850,12 @@
   main();
 
   let timer = null;
-  new MutationObserver(() => {
+  function scheduleScan(delay = 250) {
     clearTimeout(timer);
-    timer = setTimeout(main, 1000);
+    timer = setTimeout(main, delay);
+  }
+
+  new MutationObserver(() => {
+    scheduleScan(getMinMonthlySalaryYen() > 0 ? 80 : 1000);
   }).observe(document.body, { childList: true, subtree: true });
 })();
