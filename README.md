@@ -17,5 +17,5 @@
    - [Chrome 版 Tampermonkey](https://chromewebstore.google.com/detail/tampermonkey/dhdgffkkebhmkfjojejmpbldmpobfkfo)
    - [Firefox 版 Tampermonkey](https://addons.mozilla.org/firefox/addon/tampermonkey/)
 
-2. このリポジトリの `RikunabiPlus.js` を開きます。
-   - [RikunabiPlus.js](https://github.com/yonagatsuki/Rikunabi-Plus/blob/main/RikunabiPlus.js)
+2. インストールリンク
+   - [RikunabiPlus.js をインストール](https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.js)
