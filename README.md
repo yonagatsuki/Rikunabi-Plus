@@ -18,4 +18,4 @@
    - [Firefox 版 Tampermonkey](https://addons.mozilla.org/firefox/addon/tampermonkey/)
 
 2. インストールリンク
-   - [RikunabiPlus.js をインストール](https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.js)
+   - [スクリプトをインストール / Install script](https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.user.js)
