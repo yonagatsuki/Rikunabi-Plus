@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.9
+// @version      1.6.0
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -20,7 +20,7 @@
   'use strict';
 
   const CONCURRENCY = 4;
-  const CACHE_PREFIX = 'rikunabi_salary_v10:';
+  const CACHE_PREFIX = 'rikunabi_salary_v11:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
@@ -53,6 +53,26 @@
       color: #666;
       background: #f7f7f7;
       border-left-color: #aaa;
+    }
+    .rk-salary-content {
+      display: block;
+      margin-top: 2px;
+    }
+    .rk-salary-toggle {
+      appearance: none;
+      border: 1px solid #d6d6d6;
+      border-radius: 4px;
+      background: #fff;
+      color: #333;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.3;
+      margin-top: 6px;
+      padding: 4px 8px;
+    }
+    .rk-salary-toggle:hover {
+      background: #f5f5f5;
+      border-color: #999;
     }
     .rk-plus-actions {
       display: flex;
@@ -495,7 +515,6 @@
 
       if (!card) continue;
       if (seenCards.has(card)) continue;
-      if (card.querySelector('.rk-salary-box')) continue;
 
       const cardText = textOf(card);
 
@@ -879,6 +898,9 @@
   }
 
   function insertBox(card) {
+    const current = card.querySelector('.rk-salary-box');
+    if (current) return current;
+
     const box = document.createElement('div');
     box.className = 'rk-salary-box rk-salary-loading';
     box.textContent = '給与：取得中...';
@@ -893,6 +915,15 @@
     return box;
   }
 
+  function renderSalaryForUrl(url, salary) {
+    const card = visibleCardsByUrl.get(url);
+    if (!card) return;
+
+    const box = insertBox(card);
+    render(box, salary);
+    updateCardVisibility(url);
+  }
+
   function render(box, salary) {
     if (!salary || salary === '給与情報が見つかりませんでした') {
       box.remove();
@@ -900,7 +931,57 @@
     }
 
     box.className = 'rk-salary-box';
-    box.innerHTML = `<b>給与</b>\n${escapeHtml(salary)}`;
+    box.textContent = '';
+
+    const label = document.createElement('b');
+    label.textContent = '給与';
+
+    const content = document.createElement('span');
+    content.className = 'rk-salary-content';
+
+    const summary = summarizeSalary(salary);
+    content.textContent = summary.text;
+
+    box.appendChild(label);
+    box.appendChild(content);
+
+    if (summary.collapsible) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'rk-salary-toggle';
+      button.textContent = '詳細を表示';
+      button.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+
+        const expanded = button.dataset.expanded === 'true';
+        button.dataset.expanded = expanded ? 'false' : 'true';
+        content.textContent = expanded ? summary.text : salary;
+        button.textContent = expanded ? '詳細を表示' : '閉じる';
+      });
+      box.appendChild(button);
+    }
+  }
+
+  function summarizeSalary(salary) {
+    const full = cleanText(salary);
+    const lines = full.split('\n').map(cleanText).filter(Boolean);
+    const summaryLines = [];
+    const stopRe = /^(【諸手当】|諸手当|●|【昇給】|昇給|【賞与】|賞与)/;
+
+    for (const line of lines) {
+      if (summaryLines.length >= 12) break;
+      if (stopRe.test(line) && summaryLines.length >= 4) break;
+      summaryLines.push(line);
+    }
+
+    let text = summaryLines.join('\n');
+    if (text.length > 520) text = text.slice(0, 520) + '...';
+
+    return {
+      text,
+      collapsible: text !== full,
+    };
   }
 
   function escapeHtml(s) {
@@ -913,15 +994,14 @@
     }[c]));
   }
 
-  async function loadSalary({ url, box }) {
+  async function loadSalary(url) {
     const cacheKey = CACHE_PREFIX + url;
 
     try {
       const cached = sessionStorage.getItem(cacheKey);
       if (cached && cached !== '給与情報が見つかりませんでした') {
         salaryTextByUrl.set(url, cached);
-        render(box, cached);
-        updateCardVisibility(url);
+        renderSalaryForUrl(url, cached);
         return;
       }
 
@@ -930,10 +1010,8 @@
 
       sessionStorage.setItem(cacheKey, salary);
       salaryTextByUrl.set(url, salary);
-      render(box, salary);
-      updateCardVisibility(url);
+      renderSalaryForUrl(url, salary);
     } catch {
-      box.remove();
       salaryTextByUrl.set(url, '');
       updateCardVisibility(url);
     }
@@ -944,7 +1022,7 @@
 
     async function worker() {
       while (index < items.length) {
-        await loadSalary(items[index++]);
+        await loadSalary(items[index++].url);
       }
     }
 
@@ -959,15 +1037,21 @@
     ensureHiddenManager();
     ensureSalaryFilter();
 
-    const items = findResultCards()
-      .filter(({ url }) => !salaryQueuedUrls.has(url) && !salaryTextByUrl.has(url))
-      .map(({ card, url }) => {
+    const items = [];
+
+    for (const { card, url } of findResultCards()) {
+      if (salaryTextByUrl.has(url)) {
+        renderSalaryForUrl(url, salaryTextByUrl.get(url));
+        continue;
+      }
+
+      insertBox(card);
+
+      if (!salaryQueuedUrls.has(url)) {
         salaryQueuedUrls.add(url);
-        return {
-          url,
-          box: insertBox(card),
-        };
-      });
+        items.push({ url });
+      }
+    }
 
     if (items.length) runQueue(items);
   }
