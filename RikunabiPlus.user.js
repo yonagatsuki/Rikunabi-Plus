@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.3
+// @version      1.5.4
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -20,7 +20,7 @@
   'use strict';
 
   const CONCURRENCY = 4;
-  const CACHE_PREFIX = 'rikunabi_salary_v4:';
+  const CACHE_PREFIX = 'rikunabi_salary_v5:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
@@ -814,7 +814,7 @@
 
     try {
       const cached = sessionStorage.getItem(cacheKey);
-      if (cached) {
+      if (cached && cached !== '給与情報が見つかりませんでした') {
         salaryTextByUrl.set(url, cached);
         render(box, cached);
         updateCardVisibility(url);
