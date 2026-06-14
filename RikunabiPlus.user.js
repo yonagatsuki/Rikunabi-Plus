@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.5
+// @version      1.5.6
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -20,7 +20,7 @@
   'use strict';
 
   const CONCURRENCY = 4;
-  const CACHE_PREFIX = 'rikunabi_salary_v6:';
+  const CACHE_PREFIX = 'rikunabi_salary_v7:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
@@ -297,7 +297,7 @@
       .filter(line => !/^(給与|初任給|賃金)$/.test(line));
 
     const result = lines.join('\n');
-    return result.length > 420 ? result.slice(0, 420) + '...' : result;
+    return result.length > 1200 ? result.slice(0, 1200) + '...' : result;
   }
 
   function extractSalary(html) {
@@ -355,6 +355,11 @@
       .replace(/(給与詳細)/g, '\n$1')
       .replace(/(勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)/g, '\n$1');
 
+    const sectionMatch = normalized.match(/(?:^|\n)(給与|初任給|賃金)\n?([\s\S]{0,2400}?)(?=\n(?:勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)|$)/);
+    if (sectionMatch && moneyRe.test(sectionMatch[2])) {
+      return formatSalaryForDisplay(sectionMatch[2]);
+    }
+
     const lines = normalized
       .split('\n')
       .map(cleanText)
@@ -364,7 +369,7 @@
       if (!/^(給与|初任給|賃金)$/.test(lines[i])) continue;
 
       const section = [];
-      for (let j = i + 1; j < lines.length && section.length < 10; j += 1) {
+      for (let j = i + 1; j < lines.length && section.length < 24; j += 1) {
         if (/^(勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)$/.test(lines[j])) break;
         section.push(lines[j]);
       }
@@ -837,7 +842,7 @@
     }
 
     box.className = 'rk-salary-box';
-    box.innerHTML = `<b>給与</b>${escapeHtml(salary)}`;
+    box.innerHTML = `<b>給与</b>\n${escapeHtml(salary)}`;
   }
 
   function escapeHtml(s) {
