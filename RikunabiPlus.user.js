@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.2
+// @version      1.5.3
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -316,6 +316,9 @@
 
     if (fromRows) return fromRows;
 
+    const labeledByText = extractSalaryNearLabel(textOf(doc.body));
+    if (labeledByText) return labeledByText;
+
     const blocks = [...doc.querySelectorAll('section, article, table, dl, div, li, p')]
       .map(textOf)
       .filter(t => t.length >= 8 && t.length <= 3000);
@@ -330,6 +333,24 @@
       .slice(0, 8);
 
     return moneyLines.length ? compactSalary(moneyLines.join('\n')) : '';
+  }
+
+  function extractSalaryNearLabel(text) {
+    const lines = cleanText(text)
+      .split('\n')
+      .map(cleanText)
+      .filter(Boolean);
+
+    for (let i = 0; i < lines.length; i += 1) {
+      if (!/^給与$|^初任給$|^賃金$/.test(lines[i])) continue;
+
+      const nearby = lines.slice(i, i + 8).join('\n');
+      if (moneyRe.test(nearby)) return compactSalary(nearby);
+    }
+
+    const compact = lines.join('\n');
+    const match = compact.match(/(?:給与|初任給|賃金)\n?([\s\S]{0,900}?(?:月給|基本給)[\s\S]{0,900}?(?:円|万円))/);
+    return match ? compactSalary(match[0]) : '';
   }
 
   function requestText(url) {
