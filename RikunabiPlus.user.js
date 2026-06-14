@@ -1,13 +1,14 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.6.5
+// @version      1.6.6
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
 // @supportURL   https://github.com/yonagatsuki/Rikunabi-Plus/issues
 // @updateURL    https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.user.js
 // @downloadURL  https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.user.js
+// @match        https://job.rikunabi.com/*
 // @match        https://job.rikunabi.com/*/job_search/*
 // @match        https://job.rikunabi.com/*/company_search/*
 // @match        https://job.rikunabi.com/*/search/*
