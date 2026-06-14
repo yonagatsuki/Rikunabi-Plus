@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.6.0
+// @version      1.6.1
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -505,13 +505,7 @@
     for (const { a, url } of anchors) {
       if (seenUrls.has(url)) continue;
 
-      const card =
-        a.closest('[class*="cassette"]') ||
-        a.closest('[class*="result"]') ||
-        a.closest('[class*="job"]') ||
-        a.closest('[class*="company"]') ||
-        a.closest('article') ||
-        a.closest('li');
+      const card = getResultCard(a, url);
 
       if (!card) continue;
       if (seenCards.has(card)) continue;
@@ -532,6 +526,27 @@
     }
 
     return cards;
+  }
+
+  function getResultCard(anchor, url) {
+    try {
+      const path = new URL(url).pathname;
+      if (/\/selection\/job_descriptions\//.test(path)) {
+        return anchor.closest('li') || anchor;
+      }
+    } catch {
+      // URL の解析に失敗した場合は通常の候補に進む。
+    }
+
+    return (
+      anchor.closest('li') ||
+      anchor.closest('article') ||
+      anchor.closest('[class*="cassette"]') ||
+      anchor.closest('[class*="card"]') ||
+      anchor.closest('[class*="result"]') ||
+      anchor.closest('[class*="company"]') ||
+      anchor
+    );
   }
 
   function isHiddenJob(url) {
@@ -967,16 +982,16 @@
     const full = cleanText(salary);
     const lines = full.split('\n').map(cleanText).filter(Boolean);
     const summaryLines = [];
-    const stopRe = /^(【諸手当】|諸手当|●|【昇給】|昇給|【賞与】|賞与)/;
+    const stopRe = /^(【給与】|給与例|【手当】|手当|【諸手当】|諸手当|●|【昇給】|昇給|【賞与】|賞与)/;
 
     for (const line of lines) {
-      if (summaryLines.length >= 12) break;
-      if (stopRe.test(line) && summaryLines.length >= 4) break;
+      if (summaryLines.length >= 8) break;
+      if (stopRe.test(line) && summaryLines.length >= 3) break;
       summaryLines.push(line);
     }
 
     let text = summaryLines.join('\n');
-    if (text.length > 520) text = text.slice(0, 520) + '...';
+    if (text.length > 420) text = text.slice(0, 420) + '...';
 
     return {
       text,
