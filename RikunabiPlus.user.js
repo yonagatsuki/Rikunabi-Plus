@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.6.2
+// @version      1.6.3
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -511,9 +511,10 @@
       if (seenCards.has(card)) continue;
 
       const cardText = textOf(card);
+      const isSelectionJob = isSelectionJobDescriptionUrl(url);
 
-      if (!isSelectionJobDescriptionUrl(url) && cardText.length < 80) continue;
-      if (navTextRe.test(cardText) && cardText.length < 250) continue;
+      if (!isSelectionJob && cardText.length < 80) continue;
+      if (!isSelectionJob && navTextRe.test(cardText) && cardText.length < 250) continue;
 
       seenUrls.add(url);
       visibleCardsByUrl.set(url, card);
