@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.7
+// @version      1.5.8
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -20,7 +20,7 @@
   'use strict';
 
   const CONCURRENCY = 4;
-  const CACHE_PREFIX = 'rikunabi_salary_v8:';
+  const CACHE_PREFIX = 'rikunabi_salary_v9:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
@@ -301,6 +301,9 @@
   }
 
   function extractSalary(html) {
+    const plainTextSalary = extractSalarySection(htmlToPlainText(html));
+    if (plainTextSalary) return plainTextSalary;
+
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const rowCandidates = [];
 
@@ -349,12 +352,31 @@
     return moneyLines.length ? formatSalaryForDisplay(compactSalary(moneyLines.join('\n'))) : '';
   }
 
+  function htmlToPlainText(html) {
+    const withoutScripts = String(html || '')
+      .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<noscript[\s\S]*?<\/noscript>/gi, ' ');
+
+    const withBreaks = withoutScripts
+      .replace(/<(br|\/p|\/div|\/section|\/article|\/li|\/tr|\/dt|\/dd|\/h[1-6])\b[^>]*>/gi, '\n')
+      .replace(/<(p|div|section|article|li|tr|dt|dd|h[1-6])\b[^>]*>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ');
+
+    const textarea = document.createElement('textarea');
+    textarea.innerHTML = withBreaks;
+    return cleanText(textarea.value);
+  }
+
   function extractSalarySection(text) {
     const normalized = cleanText(text)
       .replace(/\s+(給与|初任給|賃金)\s*(?=(?:月給|年俸|時給|日給|給与詳細|基本給|[0-9０-９]))/g, '\n$1\n')
       .replace(/(給与)\s*(月給|年俸|時給|日給)/g, '$1\n$2')
       .replace(/(給与詳細)/g, '\n$1')
       .replace(/(職種と仕事内容|配属職種について|勤務地|勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)/g, '\n$1');
+
+    const keywordMatch = extractSalaryByKeyword(normalized);
+    if (keywordMatch) return keywordMatch;
 
     const sectionMatch = normalized.match(/(?:^|\n)(給与|初任給|賃金)\n?([\s\S]{0,2400}?)(?=\n(?:職種と仕事内容|配属職種について|勤務地|勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)|$)/);
     if (sectionMatch && moneyRe.test(sectionMatch[2])) {
@@ -377,6 +399,29 @@
 
       const joined = section.join('\n');
       if (moneyRe.test(joined)) return formatSalaryForDisplay(joined);
+    }
+
+    return '';
+  }
+
+  function extractSalaryByKeyword(text) {
+    const normalized = cleanText(text);
+    const stopRe = /(職種と仕事内容|配属職種について|勤務地|勤務時間|勤務時間詳細|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要|エントリー画面へ行く)/g;
+    const labelRe = /(給与|初任給|賃金)/g;
+    let match;
+
+    while ((match = labelRe.exec(normalized)) !== null) {
+      const start = match.index + match[0].length;
+      let section = normalized.slice(start, start + 2600);
+      const stop = section.search(stopRe);
+      if (stop >= 0) section = section.slice(0, stop);
+
+      if (!moneyRe.test(section)) continue;
+
+      const firstMoney = section.search(/(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円))/);
+      if (firstMoney > 260) continue;
+
+      return formatSalaryForDisplay(section);
     }
 
     return '';
