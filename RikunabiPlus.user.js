@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.4.0
+// @version      1.4.1
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -28,6 +28,7 @@
   const salaryLabelRe = /(給与|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
   const moneyRe = /(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円)|[¥￥]\s*[0-9０-９])/;
   const navTextRe = /(ログイン|会員登録|ヘルプ|検索条件|トップ|マイページ|ナビ|メニュー|お気に入り|説明会|インターン)/;
+  const actionTextRe = /(求人|詳細|詳しく見る|見る|表示しない|表示する|エントリー|説明会|予約|検討リスト|気になる|お気に入り|ログイン|会員登録)/;
 
   const style = document.createElement('style');
   style.textContent = `
@@ -376,9 +377,35 @@
   }
 
   function getJobTitle(card) {
-    const titleLink = card.querySelector('a[href]');
-    const title = textOf(titleLink);
-    return title || textOf(card).split('\n').find(Boolean) || '求人';
+    const candidates = [];
+
+    card.querySelectorAll('h1, h2, h3, h4, [class*="title"], [class*="name"], [class*="company"]').forEach(el => {
+      const text = textOf(el);
+      if (text) candidates.push(text);
+    });
+
+    card.querySelectorAll('a[href]').forEach(link => {
+      const text = textOf(link);
+      if (text) candidates.push(text);
+    });
+
+    textOf(card).split('\n').forEach(line => {
+      const text = cleanText(line);
+      if (text) candidates.push(text);
+    });
+
+    const normalized = candidates
+      .map(text => cleanText(text).replace(/\s+/g, ' '))
+      .filter(Boolean)
+      .filter(text => text.length >= 4 && text.length <= 120)
+      .filter(text => !actionTextRe.test(text))
+      .filter(text => !salaryLabelRe.test(text))
+      .filter(text => !moneyRe.test(text));
+
+    const companyLike = normalized.find(text => /(株式会社|有限会社|合同会社|\(株\)|（株）)/.test(text));
+    if (companyLike) return companyLike;
+
+    return normalized[0] || 'タイトル未取得';
   }
 
   function getHiddenJobs() {
@@ -495,13 +522,17 @@
 
     const list = body.querySelector('.rk-plus-hidden-list');
     jobs.forEach(job => {
+      const currentCard = visibleCardsByUrl.get(job.url);
+      const currentTitle = currentCard ? getJobTitle(currentCard) : '';
+      const displayTitle = currentTitle && currentTitle !== 'タイトル未取得' ? currentTitle : job.title;
+
       const item = document.createElement('li');
       item.className = 'rk-plus-hidden-item';
 
       const title = document.createElement('span');
       title.className = 'rk-plus-hidden-title';
-      title.textContent = job.title || '求人';
-      title.title = job.title || '求人';
+      title.textContent = displayTitle || 'タイトル未取得';
+      title.title = displayTitle || 'タイトル未取得';
 
       const button = document.createElement('button');
       button.type = 'button';
