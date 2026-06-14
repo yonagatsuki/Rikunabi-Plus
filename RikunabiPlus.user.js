@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.6.4
+// @version      1.6.5
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -497,7 +497,12 @@
   function findResultCards() {
     const anchors = [...document.querySelectorAll('a[href]')]
       .map(a => ({ a, url: normalizeUrl(a.href) }))
-      .filter(x => x.url && isLikelyDetailUrl(x.url) && textOf(x.a).length > 0);
+      .filter(x => (
+        x.url &&
+        isLikelyDetailUrl(x.url) &&
+        textOf(x.a).length > 0 &&
+        !x.a.closest('.rk-plus-panel, .rk-plus-panel-backdrop, .rk-salary-box')
+      ));
 
     const seenUrls = new Set();
     const seenCards = new Set();
@@ -509,6 +514,7 @@
       const card = getResultCard(a, url);
 
       if (!card) continue;
+      if (card.closest('.rk-plus-panel, .rk-plus-panel-backdrop, .rk-salary-box')) continue;
       if (seenCards.has(card)) continue;
 
       const cardText = textOf(card);
@@ -534,7 +540,10 @@
     try {
       const path = new URL(url).pathname;
       if (/\/selection\/job_descriptions\//.test(path)) {
-        return anchor.closest('li') || anchor;
+        const listItem = anchor.closest('li');
+        if (!listItem) return null;
+        if (!listItem.querySelector('a.styles_bigCardWrapper__T4lRi, a[class*="styles_bigCardWrapper"]')) return null;
+        return listItem;
       }
     } catch {
       // URL の解析に失敗した場合は通常の候補に進む。
@@ -546,8 +555,7 @@
       anchor.closest('[class*="cassette"]') ||
       anchor.closest('[class*="card"]') ||
       anchor.closest('[class*="result"]') ||
-      anchor.closest('[class*="company"]') ||
-      anchor
+      anchor.closest('[class*="company"]')
     );
   }
 
