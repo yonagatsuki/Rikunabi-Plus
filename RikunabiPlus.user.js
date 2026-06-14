@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.4.1
+// @version      1.4.2
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -163,6 +163,16 @@
       overflow: hidden;
       text-overflow: ellipsis;
       white-space: nowrap;
+    }
+    .rk-plus-hidden-title-link {
+      color: #0645ad;
+      overflow: hidden;
+      text-decoration: none;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .rk-plus-hidden-title-link:hover {
+      text-decoration: underline;
     }
     .rk-plus-empty {
       color: #666;
@@ -529,8 +539,11 @@
       const item = document.createElement('li');
       item.className = 'rk-plus-hidden-item';
 
-      const title = document.createElement('span');
-      title.className = 'rk-plus-hidden-title';
+      const title = document.createElement('a');
+      title.className = 'rk-plus-hidden-title-link';
+      title.href = job.url;
+      title.target = '_blank';
+      title.rel = 'noopener noreferrer';
       title.textContent = displayTitle || 'タイトル未取得';
       title.title = displayTitle || 'タイトル未取得';
 
