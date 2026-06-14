@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.6.1
+// @version      1.6.2
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -512,7 +512,7 @@
 
       const cardText = textOf(card);
 
-      if (cardText.length < 80) continue;
+      if (!isSelectionJobDescriptionUrl(url) && cardText.length < 80) continue;
       if (navTextRe.test(cardText) && cardText.length < 250) continue;
 
       seenUrls.add(url);
@@ -547,6 +547,14 @@
       anchor.closest('[class*="company"]') ||
       anchor
     );
+  }
+
+  function isSelectionJobDescriptionUrl(url) {
+    try {
+      return /\/selection\/job_descriptions\//.test(new URL(url).pathname);
+    } catch {
+      return false;
+    }
   }
 
   function isHiddenJob(url) {
