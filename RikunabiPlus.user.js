@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.8
+// @version      1.5.9
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -20,7 +20,7 @@
   'use strict';
 
   const CONCURRENCY = 4;
-  const CACHE_PREFIX = 'rikunabi_salary_v9:';
+  const CACHE_PREFIX = 'rikunabi_salary_v10:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
@@ -301,11 +301,11 @@
   }
 
   function extractSalary(html) {
-    const plainTextSalary = extractSalarySection(htmlToPlainText(html));
-    if (plainTextSalary) return plainTextSalary;
-
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const rowCandidates = [];
+
+    const salaryArticle = extractSalaryArticle(doc);
+    if (salaryArticle) return salaryArticle;
 
     const salarySection = extractSalarySection(textOf(doc.body));
     if (salarySection) return salarySection;
@@ -350,6 +350,18 @@
       .slice(0, 8);
 
     return moneyLines.length ? formatSalaryForDisplay(compactSalary(moneyLines.join('\n'))) : '';
+  }
+
+  function extractSalaryArticle(doc) {
+    for (const article of doc.querySelectorAll('article')) {
+      const heading = textOf(article.querySelector('[class*="heading"], h1, h2, h3, h4'));
+      if (!/^(給与|初任給|賃金)$/.test(heading)) continue;
+
+      const text = htmlToPlainText(article.innerHTML);
+      if (moneyRe.test(text)) return formatSalaryForDisplay(text);
+    }
+
+    return '';
   }
 
   function htmlToPlainText(html) {
@@ -472,7 +484,6 @@
 
     for (const { a, url } of anchors) {
       if (seenUrls.has(url)) continue;
-      seenUrls.add(url);
 
       const card =
         a.closest('[class*="cassette"]') ||
@@ -491,6 +502,7 @@
       if (cardText.length < 80) continue;
       if (navTextRe.test(cardText) && cardText.length < 250) continue;
 
+      seenUrls.add(url);
       visibleCardsByUrl.set(url, card);
 
       addHideButton(card, url);
