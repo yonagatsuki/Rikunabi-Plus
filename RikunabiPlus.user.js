@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Rikunabi 検索結果に給与を表示
+// @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.2.1
+// @version      1.2.2
 // @author       yonagatsuki
-// @description  リクナビの各検索結果ページに、詳細ページから取得した給与情報を表示します
+// @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
 // @supportURL   https://github.com/yonagatsuki/Rikunabi-Plus/issues
 // @updateURL    https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.user.js
