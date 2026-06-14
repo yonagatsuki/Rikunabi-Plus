@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.2.2
+// @version      1.3.0
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -21,6 +21,7 @@
 
   const CONCURRENCY = 4;
   const CACHE_PREFIX = 'rikunabi_salary_v4:';
+  const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
 
   const salaryLabelRe = /(給与|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
   const moneyRe = /(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円)|[¥￥]\s*[0-9０-９])/;
@@ -46,6 +47,26 @@
       color: #666;
       background: #f7f7f7;
       border-left-color: #aaa;
+    }
+    .rk-plus-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin: 6px 0;
+    }
+    .rk-plus-hide-button {
+      appearance: none;
+      border: 1px solid #d6d6d6;
+      border-radius: 4px;
+      background: #fff;
+      color: #444;
+      cursor: pointer;
+      font-size: 12px;
+      line-height: 1.3;
+      padding: 4px 8px;
+    }
+    .rk-plus-hide-button:hover {
+      border-color: #999;
+      background: #f5f5f5;
     }
   `;
   document.head.appendChild(style);
@@ -201,11 +222,62 @@
       if (cardText.length < 80) continue;
       if (navTextRe.test(cardText) && cardText.length < 250) continue;
 
+      if (isHiddenJob(url)) {
+        card.style.display = 'none';
+        continue;
+      }
+
+      addHideButton(card, url);
+
       seenCards.add(card);
       cards.push({ card, url });
     }
 
     return cards;
+  }
+
+  function isHiddenJob(url) {
+    try {
+      return localStorage.getItem(HIDDEN_PREFIX + url) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  function hideJob(card, url) {
+    try {
+      localStorage.setItem(HIDDEN_PREFIX + url, '1');
+    } catch {
+      // localStorage が利用できない場合でも、現在のページでは非表示にする。
+    }
+    card.style.display = 'none';
+  }
+
+  function addHideButton(card, url) {
+    if (card.querySelector('.rk-plus-hide-button')) return;
+
+    const actions = document.createElement('div');
+    actions.className = 'rk-plus-actions';
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'rk-plus-hide-button';
+    button.textContent = '非表示';
+    button.title = 'この求人を非表示にします';
+    button.addEventListener('click', event => {
+      event.preventDefault();
+      event.stopPropagation();
+      hideJob(card, url);
+    });
+
+    actions.appendChild(button);
+
+    const titleLink = card.querySelector('a[href]');
+    if (titleLink && titleLink.parentElement) {
+      titleLink.parentElement.insertAdjacentElement('afterend', actions);
+    } else {
+      card.prepend(actions);
+    }
   }
 
   function insertBox(card) {
