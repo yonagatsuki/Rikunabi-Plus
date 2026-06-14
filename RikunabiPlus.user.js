@@ -2,7 +2,12 @@
 // @name         Rikunabi 検索結果に給与を表示
 // @namespace    https://job.rikunabi.com/
 // @version      1.2.1
+// @author       yonagatsuki
 // @description  リクナビの各検索結果ページに、詳細ページから取得した給与情報を表示します
+// @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
+// @supportURL   https://github.com/yonagatsuki/Rikunabi-Plus/issues
+// @updateURL    https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.user.js
+// @downloadURL  https://raw.githubusercontent.com/yonagatsuki/Rikunabi-Plus/main/RikunabiPlus.user.js
 // @match        https://job.rikunabi.com/*/job_search/*
 // @match        https://job.rikunabi.com/*/company_search/*
 // @match        https://job.rikunabi.com/*/search/*
