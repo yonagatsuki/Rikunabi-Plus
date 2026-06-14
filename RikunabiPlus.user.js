@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.5.4
+// @version      1.5.5
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -20,7 +20,7 @@
   'use strict';
 
   const CONCURRENCY = 4;
-  const CACHE_PREFIX = 'rikunabi_salary_v5:';
+  const CACHE_PREFIX = 'rikunabi_salary_v6:';
   const HIDDEN_PREFIX = 'rikunabi_plus_hidden_v1:';
   const HIDDEN_INDEX_KEY = 'rikunabi_plus_hidden_jobs_v1';
   const SALARY_FILTER_KEY = 'rikunabi_plus_min_monthly_salary_v1';
@@ -28,7 +28,7 @@
   const salaryTextByUrl = new Map();
   const salaryQueuedUrls = new Set();
 
-  const salaryLabelRe = /(給与|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
+  const salaryLabelRe = /(給与|給与詳細|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
   const moneyRe = /(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円)|[¥￥]\s*[0-9０-９])/;
   const navTextRe = /(ログイン|会員登録|ヘルプ|検索条件|トップ|マイページ|ナビ|メニュー|お気に入り|説明会|インターン)/;
   const actionTextRe = /(求人|詳細|詳しく見る|見る|表示しない|表示する|エントリー|説明会|予約|検討リスト|気になる|お気に入り|ログイン|会員登録)/;
@@ -289,9 +289,23 @@
     return result.length > 320 ? result.slice(0, 320) + '...' : result;
   }
 
+  function formatSalaryForDisplay(text) {
+    const lines = cleanText(text)
+      .split('\n')
+      .map(cleanText)
+      .filter(Boolean)
+      .filter(line => !/^(給与|初任給|賃金)$/.test(line));
+
+    const result = lines.join('\n');
+    return result.length > 420 ? result.slice(0, 420) + '...' : result;
+  }
+
   function extractSalary(html) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const rowCandidates = [];
+
+    const salarySection = extractSalarySection(textOf(doc.body));
+    if (salarySection) return salarySection;
 
     doc.querySelectorAll('tr').forEach(tr => {
       const cells = [...tr.children].map(textOf).filter(Boolean);
@@ -314,7 +328,7 @@
       .map(compactSalary)
       .find(s => s && moneyRe.test(s));
 
-    if (fromRows) return fromRows;
+    if (fromRows) return formatSalaryForDisplay(fromRows);
 
     const labeledByText = extractSalaryNearLabel(textOf(doc.body));
     if (labeledByText) return labeledByText;
@@ -324,7 +338,7 @@
       .filter(t => t.length >= 8 && t.length <= 3000);
 
     const labeled = blocks.find(t => salaryLabelRe.test(t) && moneyRe.test(t));
-    if (labeled) return compactSalary(labeled);
+    if (labeled) return formatSalaryForDisplay(compactSalary(labeled));
 
     const moneyLines = textOf(doc.body)
       .split('\n')
@@ -332,7 +346,34 @@
       .filter(line => salaryLabelRe.test(line) || moneyRe.test(line))
       .slice(0, 8);
 
-    return moneyLines.length ? compactSalary(moneyLines.join('\n')) : '';
+    return moneyLines.length ? formatSalaryForDisplay(compactSalary(moneyLines.join('\n'))) : '';
+  }
+
+  function extractSalarySection(text) {
+    const normalized = cleanText(text)
+      .replace(/(給与)\s*(月給|年俸|時給|日給)/g, '$1\n$2')
+      .replace(/(給与詳細)/g, '\n$1')
+      .replace(/(勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)/g, '\n$1');
+
+    const lines = normalized
+      .split('\n')
+      .map(cleanText)
+      .filter(Boolean);
+
+    for (let i = 0; i < lines.length; i += 1) {
+      if (!/^(給与|初任給|賃金)$/.test(lines[i])) continue;
+
+      const section = [];
+      for (let j = i + 1; j < lines.length && section.length < 10; j += 1) {
+        if (/^(勤務時間|休日・休暇|福利厚生|喫煙所情報|試用期間|職場情報|募集概要)$/.test(lines[j])) break;
+        section.push(lines[j]);
+      }
+
+      const joined = section.join('\n');
+      if (moneyRe.test(joined)) return formatSalaryForDisplay(joined);
+    }
+
+    return '';
   }
 
   function extractSalaryNearLabel(text) {
@@ -345,12 +386,12 @@
       if (!/^給与$|^初任給$|^賃金$/.test(lines[i])) continue;
 
       const nearby = lines.slice(i, i + 8).join('\n');
-      if (moneyRe.test(nearby)) return compactSalary(nearby);
+      if (moneyRe.test(nearby)) return formatSalaryForDisplay(nearby);
     }
 
     const compact = lines.join('\n');
     const match = compact.match(/(?:給与|初任給|賃金)\n?([\s\S]{0,900}?(?:月給|基本給)[\s\S]{0,900}?(?:円|万円))/);
-    return match ? compactSalary(match[0]) : '';
+    return match ? formatSalaryForDisplay(match[0]) : '';
   }
 
   function requestText(url) {
