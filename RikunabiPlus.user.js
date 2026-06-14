@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Rikunabi Plus
 // @namespace    https://job.rikunabi.com/
-// @version      1.6.3
+// @version      1.6.4
 // @author       yonagatsuki
 // @description  リクナビの求人検索ページをより便利にするユーザースクリプトです
 // @homepageURL  https://github.com/yonagatsuki/Rikunabi-Plus
@@ -27,6 +27,7 @@
   const visibleCardsByUrl = new Map();
   const salaryTextByUrl = new Map();
   const salaryQueuedUrls = new Set();
+  let currentUrl = location.href;
 
   const salaryLabelRe = /(給与|給与詳細|初任給|賃金|基本給|月給|年俸|時給|日給|報酬|待遇)/;
   const moneyRe = /(月給|年俸|時給|日給|基本給|[0-9０-９][0-9０-９,，.．]*(?:円|万円)|[¥￥]\s*[0-9０-９])/;
@@ -1088,7 +1089,31 @@
     timer = setTimeout(main, delay);
   }
 
+  function handleUrlChange() {
+    if (currentUrl === location.href) return;
+
+    currentUrl = location.href;
+    visibleCardsByUrl.clear();
+    salaryQueuedUrls.clear();
+    scheduleScan(200);
+  }
+
+  function patchHistoryMethod(methodName) {
+    const original = history[methodName];
+    history[methodName] = function patchedHistoryMethod(...args) {
+      const result = original.apply(this, args);
+      setTimeout(handleUrlChange, 0);
+      return result;
+    };
+  }
+
+  patchHistoryMethod('pushState');
+  patchHistoryMethod('replaceState');
+  window.addEventListener('popstate', () => setTimeout(handleUrlChange, 0));
+  window.addEventListener('hashchange', () => setTimeout(handleUrlChange, 0));
+
   new MutationObserver(() => {
+    handleUrlChange();
     scheduleScan(getMinMonthlySalaryYen() > 0 ? 80 : 1000);
   }).observe(document.body, { childList: true, subtree: true });
 })();
